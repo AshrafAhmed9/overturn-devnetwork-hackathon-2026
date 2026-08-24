@@ -3,6 +3,7 @@ import { MissingSigningCapabilityError, runAgentInstruction } from "../lib/agent
 import { prepareModelInput } from "../lib/redaction";
 import { analyzeExtractedText } from "../lib/analysis";
 import { NutrientProcessor } from "../lib/nutrient-processor";
+import { toConfidenceFields } from "../lib/nutrient-extraction";
 
 describe("structural consent boundary", () => {
   it("rejects a jailbreak because signing capability is absent from the agent environment", () => {
@@ -30,5 +31,13 @@ describe("structural consent boundary", () => {
   it("does not attempt a Nutrient request without a server-side Processor key", async () => {
     await expect(new NutrientProcessor("").ocrToJson(new Uint8Array([1]), "scan.png"))
       .rejects.toThrow("NUTRIENT_DWS_PROCESSOR_API_KEY is not configured.");
+  });
+
+  it("retains only page-anchored, confidence-bearing extraction elements", () => {
+    const fields = toConfidenceFields({ output: { elements: [
+      { text: "63 months", confidence: 0.87, bounds: { x: 1, y: 2, width: 3, height: 4 }, page: { pageIndex: 0 } },
+      { text: "unanchored", confidence: 0.99 }
+    ] } });
+    expect(fields).toEqual([{ text: "63 months", confidence: 0.87, page: "1", bounds: { x: 1, y: 2, width: 3, height: 4 } }]);
   });
 });

@@ -11,6 +11,9 @@ export default function Home() {
   const [analysis, setAnalysis] = useState<ContradictionAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [uploadState, setUploadState] = useState<{ fields: number; needsReview: boolean } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   async function startDemo() {
     setLoading(true);
@@ -32,6 +35,16 @@ export default function Home() {
     setAnalyzing(false);
   }
 
+  async function extractUpload(file: File) {
+    setUploading(true); setUploadError(null); setUploadState(null);
+    const form = new FormData(); form.set("document", file);
+    const response = await fetch("/api/extract", { method: "POST", body: form });
+    const result = await response.json() as { fields?: unknown[]; needsReview?: boolean; error?: string };
+    if (response.ok && result.fields) setUploadState({ fields: result.fields.length, needsReview: Boolean(result.needsReview) });
+    else setUploadError(result.error ?? "The document could not be extracted.");
+    setUploading(false);
+  }
+
   async function approve() {
     if (!caseData) return;
     const response = await fetch("/api/consent", {
@@ -48,7 +61,10 @@ export default function Home() {
       <h1>Catch the rule your insurer<br />shouldn’t be able to use.</h1>
       <p className="lede">Overturn reads the evidence, spots a contradiction, drafts your appeal, and stops before filing. A person signs every time.</p>
       <button onClick={startDemo} disabled={loading}>{loading ? "Reviewing case…" : "Run the 63-month demo"}</button>
+      <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Try a PDF or scan"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label>
       <p className="fine">Synthetic documents only. No information is sent to a model until personal details are removed.</p>
+      {uploadState && <p className="upload-success">Nutrient returned {uploadState.fields} page-anchored evidence regions. {uploadState.needsReview ? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."}</p>}
+      {uploadError && <p className="model-error">Upload unavailable: {uploadError}</p>}
     </section>
 
     {caseData && <section className="workspace">
