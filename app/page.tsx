@@ -120,9 +120,9 @@ export default function Home() {
       <p className="lede">Overturn reads the evidence, spots a contradiction, drafts your appeal, and stops before filing. A person signs every time.</p>
       <button onClick={startDemo} disabled={loading}>{loading ? "Reviewing case…" : "Run the 63-month demo"}</button>
       {caseData && <a className="demo-ready" href="#case-finding">Your finding is ready below <span aria-hidden="true">↓</span></a>}
-      <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Try a PDF or scan"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label>
+      <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Test Nutrient extraction"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label>
       <p className="fine">Synthetic documents only. No information is sent to a model until personal details are removed.</p>
-      {uploadState && <p className="upload-success">Nutrient returned {extractedFields?.length ?? 0} page-anchored evidence regions. {uploadState.needsReview ? uploadState.reviewReason ?? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."}</p>}
+      {uploadState && <p className="upload-success">Nutrient returned {extractedFields?.length ?? 0} page-anchored evidence regions. {uploadState.needsReview ? uploadState.reviewReason ?? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."} This evidence-lab upload does not replace the seeded case used to generate the legal draft.</p>}
       {uploadError && <p className="model-error">Upload unavailable: {uploadError}</p>}
     </section>
 

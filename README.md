@@ -23,7 +23,7 @@ Required runtime values are documented in `.env.example`. The browser receives o
 ## What a judge can verify
 
 - **One-click contradiction:** the rejection letter and governing rule appear side by side. The opening screen uses plain language: an insurer used a rule after it stopped applying.
-- **Nutrient:** upload a PDF, scan, JPEG, PNG, or TIFF. Nutrient Data Extraction returns only page-anchored fields with confidence scores. Fields below 90%, or a document missing a required claim fact, are editable before any model review. The latter is the documented fallback when an OCR response reports uniformly high confidence.
+- **Nutrient evidence lab:** upload a PDF, scan, JPEG, PNG, or TIFF to verify page-anchored fields with confidence scores. Fields below 90%, or a document missing a required claim fact, are editable. The latter is the documented fallback when an OCR response reports uniformly high confidence. This separate lab does not alter the seeded legal draft.
 - **Privacy boundary:** PII redaction runs inside the model-boundary function. The UI exposes the exact redacted payload used for the model request.
 - **SerpApi:** the seeded demo performs a cached live query restricted to IRDAI. It accepts a result only when it is a direct `irdai.gov.in/documents/...pdf` URL; redirect, search, and `update_language` URLs are rejected. If the search does not return that direct PDF, the UI links to the official IRDAI Health circular index rather than relabelling an untrusted result.
 - **Human gate:** approving the rendered hash atomically advances the case in Supabase. A duplicate approval returns HTTP 409 and cannot mint a second capability.
