@@ -49,7 +49,7 @@ export default function Home() {
     if (!caseData) return;
     const response = await fetch("/api/consent", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ documentHash: caseData.documentHash, attested: true })
+      body: JSON.stringify({ caseId: caseData.caseId, documentHash: caseData.documentHash, attested: true })
     });
     setApproved(response.ok);
   }

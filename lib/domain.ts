@@ -12,6 +12,7 @@ export type LedgerEvent = {
 };
 
 export type DemoCase = {
+  caseId?: string;
   policyMonths: number;
   rejectionGround: string;
   fraudAlleged: boolean;

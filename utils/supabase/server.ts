@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@supabase/server/core";
+import type { Database } from "@/lib/database.types";
 
 /**
  * Server-only database client. Never import this module into the agent loop or
@@ -13,5 +14,5 @@ export function createServerClient() {
     );
   }
 
-  return createAdminClient();
+  return createAdminClient<Database>();
 }
