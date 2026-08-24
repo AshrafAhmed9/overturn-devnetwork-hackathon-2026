@@ -19,8 +19,12 @@ async function ensureBucket() {
       body: JSON.stringify({ id: BUCKET, name: BUCKET, public: false }),
       signal: AbortSignal.timeout(15_000),
     });
-    // 409 is the expected response after the first demo case.
-    if (!response.ok && response.status !== 409) throw new Error(`Unable to initialize protected draft storage (${response.status}).`);
+    const body = await response.json().catch(() => ({})) as { code?: string; statusCode?: string };
+    // Supabase Storage currently returns HTTP 400 with a BucketAlreadyExists
+    // payload for an already-created bucket.
+    if (!response.ok && response.status !== 409 && body.code !== "BucketAlreadyExists" && body.statusCode !== "409") {
+      throw new Error(`Unable to initialize protected draft storage (${response.status}).`);
+    }
   })();
   return bucketPromise;
 }
