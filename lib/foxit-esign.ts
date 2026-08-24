@@ -45,8 +45,11 @@ export async function prepareFoxitSandboxSigningSession(input: {
       fields: [{ type: "signature", x: 336, y: 578, width: 170, height: 28, documentNumber: 1, pageNumber: 1, tabOrder: 1, party: 1, required: true }],
       processTextTags: false,
       processAcroFields: false,
-      createEmbeddedSigningSession: false,
-      createEmbeddedSendingSession: true,
+      // The capability was minted only after human review. Foxit now creates
+      // the sandbox signing session for that human; it never signs on behalf
+      // of the agent or auto-sends an envelope.
+      createEmbeddedSigningSession: true,
+      createEmbeddedSendingSession: false,
       sendNow: false,
     }),
   });
@@ -54,6 +57,6 @@ export async function prepareFoxitSandboxSigningSession(input: {
   if (!response.ok) throw new Error(`Foxit eSign sandbox request failed (${response.status}).`);
   return {
     reference: findString(body, /folder(?:id|Id)|envelope(?:id|Id)|id$/) ?? "sandbox-envelope",
-    sendingSessionUrl: findString(body, /embedded.*(?:url|URL)|sending.*(?:url|URL)/),
+    signingSessionUrl: findString(body, /embedded.*(?:url|URL)|signing.*(?:url|URL)/),
   };
 }

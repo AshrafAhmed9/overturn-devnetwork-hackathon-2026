@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createDemoCase } from "@/lib/demo";
 import { persistDemoCase } from "@/lib/audit-store";
 import { lookupRegulatorySource } from "@/lib/regulatory-lookup";
+import { saveDraft } from "@/lib/draft-store";
+import { getDemoPdf } from "@/lib/document-generator";
 
 export async function POST() {
   let regulatorySource;
@@ -14,7 +16,10 @@ export async function POST() {
   }
   const demo = await createDemoCase(regulatorySource);
   try {
-    return NextResponse.json({ ...demo, caseId: await persistDemoCase(demo) });
+    const caseId = await persistDemoCase(demo);
+    // Persist the exact processed bytes before exposing their hash to the UI.
+    await saveDraft(caseId, await getDemoPdf());
+    return NextResponse.json({ ...demo, caseId });
   } catch (error) {
     // A sponsor outage must never prevent the one-click judging path. The UI
     // remains honest: it can show the demo, but no durable case identifier.

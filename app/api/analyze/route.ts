@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { analyzeExtractedText } from "@/lib/analysis";
 import { GeminiFlashProvider } from "@/lib/providers";
 
+export async function GET() {
+  return NextResponse.json({ available: Boolean(process.env.GEMINI_API_KEY) });
+}
+
 export async function POST(request: Request) {
   const body = await request.json() as { extractedText?: string };
   if (!body.extractedText || body.extractedText.length > 50_000) {

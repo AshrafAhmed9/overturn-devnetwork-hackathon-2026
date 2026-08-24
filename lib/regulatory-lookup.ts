@@ -1,7 +1,24 @@
 export type RegulatorySource = { url: string; title: string; snippet: string; retrievedAt: string; cached: boolean };
 
+export const IRDAI_CIRCULAR_INDEX_URL = "https://irdai.gov.in/web/guest/circulars?filterDepartment=HLT&filtersApplied=true";
+
 const cache = new Map<string, { source: Omit<RegulatorySource, "cached">; expiresAt: number }>();
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+/** Accept only a direct IRDAI document, never a redirect/search wrapper. */
+export function isOfficialCircularDocument(rawUrl: string | undefined) {
+  if (!rawUrl) return false;
+  try {
+    const url = new URL(rawUrl.replace(/\\u003d/g, "=").replace(/\\u0026/g, "&"));
+    if (url.hostname !== "irdai.gov.in") return false;
+    if (!url.pathname.startsWith("/documents/")) return false;
+    if (!/\.pdf(?:$|\/)/i.test(decodeURIComponent(url.pathname))) return false;
+    const unsafe = /(?:update_language|redirect|search|coinsnight|mmogah|fc2025)/i;
+    return !unsafe.test(`${url.pathname}?${url.searchParams.toString()}`);
+  } catch {
+    return false;
+  }
+}
 
 export async function lookupRegulatorySource(insurer: string, rejectionGround: string): Promise<RegulatorySource> {
   const key = `${insurer.toLowerCase()}:${rejectionGround.toLowerCase()}`;
@@ -18,9 +35,20 @@ export async function lookupRegulatorySource(insurer: string, rejectionGround: s
   if (!response.ok || body.error) throw new Error(body.error ?? `SerpApi request failed (${response.status}).`);
   const result = body.organic_results?.find((item) => {
     const evidence = `${item.title ?? ""} ${item.snippet ?? ""}`.toLowerCase();
-    return item.link?.includes("irdai.gov.in") && evidence.includes("master circular on health insurance business") && evidence.includes("29052024");
+    return isOfficialCircularDocument(item.link) && evidence.includes("master circular on health insurance business") && evidence.includes("29052024");
   });
-  if (!result?.link) throw new Error("SerpApi returned no official IRDAI source for this query.");
+  // The official circular index is safer than a plausibly labelled redirect.
+  // It is only used when SerpApi does not return the direct PDF itself.
+  if (!result?.link) {
+    const source = {
+      url: IRDAI_CIRCULAR_INDEX_URL,
+      title: "IRDAI circular index — Master Circular on Health Insurance Business, 29 May 2024",
+      snippet: "Official IRDAI Health Department circular index; direct PDF was not returned by the live search.",
+      retrievedAt: new Date().toISOString(),
+    };
+    cache.set(key, { source, expiresAt: Date.now() + CACHE_TTL_MS });
+    return { ...source, cached: false };
+  }
   const source = {
     url: result.link.replace(/\\u003d/g, "=").replace(/\\u0026/g, "&"),
     title: "IRDAI Master Circular on Health Insurance Business — 29 May 2024",

@@ -14,10 +14,12 @@ export default function Home() {
   const [signingCapability, setSigningCapability] = useState<string | null>(null);
   const [signerEmail] = useState("demo-signer@example.com");
   const [signingState, setSigningState] = useState<string | null>(null);
+  const [signingUrl, setSigningUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ContradictionAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [uploadState, setUploadState] = useState<{ needsReview: boolean } | null>(null);
+  const [modelAvailable, setModelAvailable] = useState<boolean | null>(null);
+  const [uploadState, setUploadState] = useState<{ needsReview: boolean; reviewReason?: string } | null>(null);
   const [extractedFields, setExtractedFields] = useState<ExtractedField[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -32,9 +34,13 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [caseData]);
 
+  useEffect(() => {
+    void fetch("/api/analyze").then(response => response.json()).then((result: { available?: boolean }) => setModelAvailable(Boolean(result.available))).catch(() => setModelAvailable(false));
+  }, []);
+
   async function startDemo() {
     setLoading(true);
-    setApproved(false); setApprovalError(null); setSigningCapability(null); setSigningState(null);
+    setApproved(false); setApprovalError(null); setSigningCapability(null); setSigningState(null); setSigningUrl(null);
     const response = await fetch("/api/demo", { method: "POST" });
     const result = await response.json() as DemoCase & { error?: string };
     if (response.ok) setCaseData(result);
@@ -59,10 +65,10 @@ export default function Home() {
     setUploading(true); setUploadError(null); setUploadState(null);
     const form = new FormData(); form.set("document", file);
     const response = await fetch("/api/extract", { method: "POST", body: form });
-    const result = await response.json() as { fields?: ExtractedField[]; needsReview?: boolean; error?: string };
+    const result = await response.json() as { fields?: ExtractedField[]; needsReview?: boolean; reviewReason?: string; error?: string };
     if (response.ok && result.fields) {
       setExtractedFields(result.fields);
-      setUploadState({ needsReview: Boolean(result.needsReview) });
+      setUploadState({ needsReview: Boolean(result.needsReview), reviewReason: result.reviewReason });
     }
     else setUploadError(result.error ?? "The document could not be extracted.");
     setUploading(false);
@@ -97,9 +103,12 @@ export default function Home() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ caseId: caseData.caseId, signingCapability, recipientEmail: signerEmail, recipientName: "Demo Signer" }),
     });
-    const result = await response.json() as { status?: string; error?: string; sendingSessionUrl?: string | null };
+    const result = await response.json() as { status?: string; error?: string; signingSessionUrl?: string | null };
     if (!response.ok) setSigningState(result.error ?? "The signing session could not be prepared.");
-    else setSigningState(result.sendingSessionUrl ? "Sandbox session prepared. Continue in the Foxit session." : "Sandbox envelope prepared. It remains unsent until the human completes it in Foxit.");
+    else {
+      setSigningUrl(result.signingSessionUrl ?? null);
+      setSigningState(result.signingSessionUrl ? "Sandbox signing session prepared. Open it in Foxit to apply the demo signature." : "Sandbox envelope prepared. Foxit did not return an embedded signing URL.");
+    }
     setSigningCapability(null);
   }
 
@@ -113,7 +122,7 @@ export default function Home() {
       {caseData && <a className="demo-ready" href="#case-finding">Your finding is ready below <span aria-hidden="true">↓</span></a>}
       <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Try a PDF or scan"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label>
       <p className="fine">Synthetic documents only. No information is sent to a model until personal details are removed.</p>
-      {uploadState && <p className="upload-success">Nutrient returned {extractedFields?.length ?? 0} page-anchored evidence regions. {uploadState.needsReview ? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."}</p>}
+      {uploadState && <p className="upload-success">Nutrient returned {extractedFields?.length ?? 0} page-anchored evidence regions. {uploadState.needsReview ? uploadState.reviewReason ?? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."}</p>}
       {uploadError && <p className="model-error">Upload unavailable: {uploadError}</p>}
     </section>
 
@@ -137,13 +146,13 @@ export default function Home() {
         <article id="policy-record" className="rule"><p className="label">THE RULE THAT APPLIES</p><strong>{caseData.policyMonths} months</strong><p>of uninterrupted coverage</p><blockquote>{caseData.legalQuote}</blockquote><a href={caseData.sources[2].href} target="_blank">View primary source ↗</a></article>
       </div>
       <div className="verdict"><span>CONTRADICTION FOUND</span><p>The policy has been active for <b>63 months</b>. The cited ground became unavailable after month 60 unless established fraud is alleged. This letter alleges none.</p></div>
-      <div className="model-check"><div><p className="eyebrow">Independent model check</p><p>Run Gemini 2.5 Flash on the same redacted evidence. It cannot see the original document text.</p></div><button onClick={validateWithGemini} disabled={analyzing}>{analyzing ? "Checking cited evidence…" : "Validate with Gemini"}</button></div>
+      <div className="model-check"><div><p className="eyebrow">Independent model check</p><p>{modelAvailable ? "Run Gemini 2.5 Flash on the same redacted evidence. It cannot see the original document text." : "The independent model check is not configured for this deployment. The cited evidence and human gate remain available."}</p></div>{modelAvailable && <button onClick={validateWithGemini} disabled={analyzing}>{analyzing ? "Checking cited evidence…" : "Validate with Gemini"}</button>}</div>
       {analysis && <div className="model-result"><p className="label">MODEL RESULT · REDACTED INPUT ONLY</p><b>{analysis.conclusion}</b>{analysis.claims.map((claim, index) => <p key={`${claim.claim}-${index}`}>{claim.claim} <small>Source: {claim.source} · confidence {Math.round(claim.confidence * 100)}%</small></p>)}</div>}
       {analysisError && <p className="model-error">Model check unavailable: {analysisError}</p>}
 
       <section className="consent">
         <div><p className="eyebrow">Consent gate</p><h2>The agent stops here.</h2><p>Review the exact draft, its sources, and its file fingerprint before you approve a one-time signing capability.</p></div>
-        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href="/api/draft" target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button>{approved && <div className="signing-form"><p className="label">Synthetic Foxit sandbox signer</p><p>This uses <code>demo-signer@example.com</code>. It creates an unsent sandbox envelope only.</p><button onClick={prepareSigningSession} disabled={!signingCapability}>{signingCapability ? "Prepare demo signing session" : "Demo signing capability consumed"}</button>{signingState && <p>{signingState}</p>}</div>}</div>
+        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href={caseData.caseId ? `/api/draft?caseId=${encodeURIComponent(caseData.caseId)}` : "/api/draft"} target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button>{approved && <div className="signing-form"><p className="label">Synthetic Foxit sandbox signer</p><p>This uses <code>demo-signer@example.com</code>. A human must complete the signature inside Foxit.</p><button onClick={prepareSigningSession} disabled={!signingCapability}>{signingCapability ? "Prepare demo signing session" : "Demo signing capability consumed"}</button>{signingState && <p>{signingState}</p>}{signingUrl && <a className="pdf-link" href={signingUrl} target="_blank" rel="noreferrer">Open Foxit signing session ↗</a>}</div>}</div>
       </section>
       {approvalError && <p className="model-error">Approval unavailable: {approvalError}</p>}
 

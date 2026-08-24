@@ -18,7 +18,15 @@ export async function POST(request: Request) {
     const fields = toConfidenceFields(parsed);
     const extractedText = fields.map((field) => field.text).join("\n");
     // This is the only output exposed to the next model stage; raw text is never returned as model input.
-    return NextResponse.json({ fields, redactedText: redactForModel(extractedText), needsReview: fields.some((field) => field.confidence < 0.9) });
+    const missingRequiredFact = !/fraud|continuous coverage|months|non-disclosure|misrepresentation/i.test(extractedText);
+    return NextResponse.json({
+      fields,
+      redactedText: redactForModel(extractedText),
+      // Nutrient confidence is primary. Missing a required claim fact is the
+      // documented fallback route when OCR reports high confidence everywhere.
+      needsReview: fields.some((field) => field.confidence < 0.9) || missingRequiredFact,
+      reviewReason: missingRequiredFact ? "A required claim fact was not found; confirm the extraction before continuing." : undefined,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Document extraction failed.";
     return NextResponse.json({ error: message }, { status: 502 });

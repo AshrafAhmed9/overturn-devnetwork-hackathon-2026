@@ -13,14 +13,14 @@ export async function POST(request: Request) {
   }
   try {
     await consumeSigningCapability(body.caseId, body.signingCapability);
-    const documentUrl = new URL("/api/draft", request.url).toString();
+    const documentUrl = new URL(`/api/draft?caseId=${encodeURIComponent(body.caseId)}`, request.url).toString();
     const session = await prepareFoxitSandboxSigningSession({
       documentUrl,
       recipientEmail: body.recipientEmail,
       recipientName: body.recipientName || "Human signer",
     });
     await recordSigningSession(body.caseId, session.reference);
-    return NextResponse.json({ status: "sandbox-session-prepared", sendingSessionUrl: session.sendingSessionUrl ?? null });
+    return NextResponse.json({ status: "sandbox-session-prepared", signingSessionUrl: session.signingSessionUrl ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to prepare signing session.";
     return NextResponse.json({ error: message }, { status: error instanceof ConsentConflictError ? 409 : 502 });
