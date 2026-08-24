@@ -42,6 +42,7 @@ export async function prepareFoxitSandboxSigningSession(input: {
         permission: "FILL_FIELDS_AND_SIGN",
         sequence: 1,
       }],
+      embeddedSignersEmailIds: [input.recipientEmail],
       fields: [{ type: "signature", x: 336, y: 578, width: 170, height: 28, documentNumber: 1, pageNumber: 1, tabOrder: 1, party: 1, required: true }],
       processTextTags: false,
       processAcroFields: false,
