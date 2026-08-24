@@ -104,7 +104,7 @@ export default function Home() {
   }
 
   return <main>
-    <nav><span className="mark">O</span><span>overturn</span><small>Claim review, under your control</small></nav>
+    <nav><span className="mark">O</span><span>overturn</span><small>Claim review, under your control</small><a className="live-demo-link" href="https://overturn-devnetwork-hackathon-2026.vercel.app" target="_blank" rel="noreferrer">Live demo ↗</a></nav>
     <section className="hero">
       <p className="eyebrow">A safer way to challenge a rejection</p>
       <h1>Catch the rule your insurer<br />shouldn’t be able to use.</h1>
