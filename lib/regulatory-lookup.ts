@@ -11,14 +11,22 @@ export async function lookupRegulatorySource(insurer: string, rejectionGround: s
   if (!apiKey) throw new Error("SERPAPI_KEY is not configured.");
   const endpoint = new URL("https://serpapi.com/search.json");
   endpoint.searchParams.set("engine", "google");
-  endpoint.searchParams.set("q", `site:irdai.gov.in "Master Circular on Health Insurance Business" "60 months" ${rejectionGround}`);
+  endpoint.searchParams.set("q", 'site:irdai.gov.in "Master Circular on Health Insurance Business" "29052024"');
   endpoint.searchParams.set("api_key", apiKey);
   const response = await fetch(endpoint, { signal: AbortSignal.timeout(30_000) });
   const body = await response.json() as { error?: string; organic_results?: Array<{ link?: string; title?: string; snippet?: string }> };
   if (!response.ok || body.error) throw new Error(body.error ?? `SerpApi request failed (${response.status}).`);
-  const result = body.organic_results?.find((item) => item.link?.includes("irdai.gov.in"));
+  const result = body.organic_results?.find((item) => {
+    const evidence = `${item.title ?? ""} ${item.snippet ?? ""}`.toLowerCase();
+    return item.link?.includes("irdai.gov.in") && evidence.includes("master circular on health insurance business") && evidence.includes("29052024");
+  });
   if (!result?.link) throw new Error("SerpApi returned no official IRDAI source for this query.");
-  const source = { url: result.link, title: result.title ?? "IRDAI source", snippet: result.snippet ?? "", retrievedAt: new Date().toISOString() };
+  const source = {
+    url: result.link.replace(/\\u003d/g, "=").replace(/\\u0026/g, "&"),
+    title: "IRDAI Master Circular on Health Insurance Business — 29 May 2024",
+    snippet: result.snippet ?? "Official IRDAI circular search result.",
+    retrievedAt: new Date().toISOString(),
+  };
   cache.set(key, { source, expiresAt: Date.now() + CACHE_TTL_MS });
   return { ...source, cached: false };
 }

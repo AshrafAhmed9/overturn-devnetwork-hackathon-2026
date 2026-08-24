@@ -4,14 +4,21 @@ import { useState } from "react";
 import type { DemoCase } from "@/lib/domain";
 import type { ContradictionAnalysis } from "@/lib/analysis";
 
+type ExtractedField = { text: string; confidence: number; page: string; bounds: { x: number; y: number; width: number; height: number } };
+
 export default function Home() {
   const [caseData, setCaseData] = useState<DemoCase | null>(null);
   const [loading, setLoading] = useState(false);
   const [approved, setApproved] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+  const [signingCapability, setSigningCapability] = useState<string | null>(null);
+  const [signerEmail, setSignerEmail] = useState("");
+  const [signingState, setSigningState] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ContradictionAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [uploadState, setUploadState] = useState<{ fields: number; needsReview: boolean } | null>(null);
+  const [uploadState, setUploadState] = useState<{ needsReview: boolean } | null>(null);
+  const [extractedFields, setExtractedFields] = useState<ExtractedField[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -39,19 +46,48 @@ export default function Home() {
     setUploading(true); setUploadError(null); setUploadState(null);
     const form = new FormData(); form.set("document", file);
     const response = await fetch("/api/extract", { method: "POST", body: form });
-    const result = await response.json() as { fields?: unknown[]; needsReview?: boolean; error?: string };
-    if (response.ok && result.fields) setUploadState({ fields: result.fields.length, needsReview: Boolean(result.needsReview) });
+    const result = await response.json() as { fields?: ExtractedField[]; needsReview?: boolean; error?: string };
+    if (response.ok && result.fields) {
+      setExtractedFields(result.fields);
+      setUploadState({ needsReview: Boolean(result.needsReview) });
+    }
     else setUploadError(result.error ?? "The document could not be extracted.");
     setUploading(false);
   }
 
+  function updateExtractedField(index: number, text: string) {
+    setExtractedFields((fields) => fields?.map((field, fieldIndex) => fieldIndex === index ? { ...field, text } : field) ?? null);
+  }
+
   async function approve() {
     if (!caseData) return;
+    setApprovalError(null);
     const response = await fetch("/api/consent", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ caseId: caseData.caseId, documentHash: caseData.documentHash, attested: true })
     });
-    setApproved(response.ok);
+    if (response.ok) {
+      const result = await response.json() as { signingCapability?: string };
+      setSigningCapability(result.signingCapability ?? null);
+      setApproved(true);
+    }
+    else {
+      const result = await response.json() as { error?: string };
+      setApprovalError(result.error ?? "Approval could not be recorded.");
+    }
+  }
+
+  async function prepareSigningSession() {
+    if (!caseData || !signingCapability) return;
+    setSigningState("Preparing the sandbox session…");
+    const response = await fetch("/api/sign", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseId: caseData.caseId, signingCapability, recipientEmail: signerEmail, recipientName: caseData.policyholder }),
+    });
+    const result = await response.json() as { status?: string; error?: string; sendingSessionUrl?: string | null };
+    if (!response.ok) setSigningState(result.error ?? "The signing session could not be prepared.");
+    else setSigningState(result.sendingSessionUrl ? "Sandbox session prepared. Continue in the Foxit session." : "Sandbox envelope prepared. It remains unsent until the human completes it in Foxit.");
+    setSigningCapability(null);
   }
 
   return <main>
@@ -63,9 +99,22 @@ export default function Home() {
       <button onClick={startDemo} disabled={loading}>{loading ? "Reviewing case…" : "Run the 63-month demo"}</button>
       <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Try a PDF or scan"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label>
       <p className="fine">Synthetic documents only. No information is sent to a model until personal details are removed.</p>
-      {uploadState && <p className="upload-success">Nutrient returned {uploadState.fields} page-anchored evidence regions. {uploadState.needsReview ? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."}</p>}
+      {uploadState && <p className="upload-success">Nutrient returned {extractedFields?.length ?? 0} page-anchored evidence regions. {uploadState.needsReview ? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."}</p>}
       {uploadError && <p className="model-error">Upload unavailable: {uploadError}</p>}
     </section>
+
+    {extractedFields && <section className="correction-panel" aria-live="polite">
+      <p className="eyebrow">Evidence confirmation</p>
+      <h2>Confirm any uncertain extraction.</h2>
+      <p>Only fields below 90% confidence need editing. Their page coordinates stay attached to the evidence.</p>
+      <div className="correction-list">{extractedFields.map((field, index) => {
+        const needsReview = field.confidence < 0.9;
+        return <label key={`${field.page}-${index}`} className={needsReview ? "needs-review" : "accepted-field"}>
+          <span>Page {field.page} · {Math.round(field.confidence * 100)}% {needsReview ? "· review required" : "· auto-accepted"}</span>
+          <input value={field.text} onChange={(event) => updateExtractedField(index, event.target.value)} aria-label={`Extracted field on page ${field.page}`} />
+        </label>;
+      })}</div>
+    </section>}
 
     {caseData && <section className="workspace">
       <div className="section-title"><p className="eyebrow">Case finding</p><h2>The insurer’s reason is three months late.</h2></div>
@@ -80,8 +129,9 @@ export default function Home() {
 
       <section className="consent">
         <div><p className="eyebrow">Consent gate</p><h2>The agent stops here.</h2><p>Review the exact draft, its sources, and its file fingerprint before you approve a one-time signing capability.</p></div>
-        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href="/api/draft" target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button></div>
+        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href="/api/draft" target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button>{approved && <div className="signing-form"><p className="label">Human-controlled Foxit sandbox</p><label>Signer email<input type="email" value={signerEmail} onChange={(event) => setSignerEmail(event.target.value)} placeholder="signer@example.com" /></label><button onClick={prepareSigningSession} disabled={!signingCapability || !signerEmail}>{signingCapability ? "Prepare signing session" : "Signing capability consumed"}</button>{signingState && <p>{signingState}</p>}</div>}</div>
       </section>
+      {approvalError && <p className="model-error">Approval unavailable: {approvalError}</p>}
 
       <section className="ledger"><div><p className="eyebrow">Agent authority ledger</p><h2>{caseData.ledger.length} tool calls, one hard boundary.</h2><p>Only reversible document work ran automatically.</p></div><div className="ledger-columns">
         <div><p className="label green">✓ REVERSIBLE · AUTO-EXECUTED</p>{caseData.ledger.filter(e => e.kind === "reversible").map(e => <p className="event" key={e.tool}><span>{e.tool}</span><small>{e.duration}</small></p>)}</div>

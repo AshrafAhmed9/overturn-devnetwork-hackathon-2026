@@ -2,11 +2,12 @@ import { createHash } from "node:crypto";
 import type { DemoCase } from "./domain";
 import { prepareModelInput } from "./redaction";
 import { demoLegalQuote, getDemoPdf } from "./document-generator";
+import type { RegulatorySource } from "./regulatory-lookup";
 
 const sourceUrl = "https://irdai.gov.in/en/circulars";
 const originalExtraction = `Repudiation letter — 17/08/2026\nPolicyholder: Ananya Rao\nPolicy No: HLTH-IND-782193\nAadhaar: 0000 0000 0000\nPAN: ABCDE0000F\nDate of birth: 12/08/1987\nGround: non-disclosure / misrepresentation of a pre-existing condition. No fraud is alleged.\nContinuous coverage: 63 months.`;
 
-export async function createDemoCase(): Promise<DemoCase> {
+export async function createDemoCase(regulatorySource?: RegulatorySource): Promise<DemoCase> {
   const input = prepareModelInput(originalExtraction);
   const pdfBytes = await getDemoPdf();
   return {
@@ -19,7 +20,11 @@ export async function createDemoCase(): Promise<DemoCase> {
     sources: [
       { label: "Rejection letter", detail: "Page 1 · stated ground; no fraud allegation", href: "#rejection-letter" },
       { label: "Policy record", detail: "Page 2 · 63 continuous months", href: "#policy-record" },
-      { label: "Regulatory circular", detail: "29 May 2024 · moratorium provision", href: sourceUrl }
+      {
+        label: regulatorySource?.title ?? "Regulatory circular",
+        detail: regulatorySource?.snippet || "29 May 2024 · moratorium provision",
+        href: regulatorySource?.url ?? sourceUrl,
+      }
     ],
     ledger: [
       { tool: "ocr_pdf", duration: "230ms", kind: "reversible" },

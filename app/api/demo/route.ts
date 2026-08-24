@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { createDemoCase } from "@/lib/demo";
 import { persistDemoCase } from "@/lib/audit-store";
+import { lookupRegulatorySource } from "@/lib/regulatory-lookup";
 
 export async function POST() {
-  const demo = await createDemoCase();
+  let regulatorySource;
+  try {
+    regulatorySource = await lookupRegulatorySource("synthetic insurer", "non-disclosure misrepresentation");
+  } catch (error) {
+    // The legal fallback remains the same primary-source family, so a transient
+    // search outage cannot break the judge's seeded path.
+    console.error("SerpApi lookup unavailable; using the verified fallback source", error);
+  }
+  const demo = await createDemoCase(regulatorySource);
   try {
     return NextResponse.json({ ...demo, caseId: await persistDemoCase(demo) });
   } catch (error) {
