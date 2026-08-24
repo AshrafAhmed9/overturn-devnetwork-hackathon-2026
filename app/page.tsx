@@ -2,17 +2,34 @@
 
 import { useState } from "react";
 import type { DemoCase } from "@/lib/domain";
+import type { ContradictionAnalysis } from "@/lib/analysis";
 
 export default function Home() {
   const [caseData, setCaseData] = useState<DemoCase | null>(null);
   const [loading, setLoading] = useState(false);
   const [approved, setApproved] = useState(false);
+  const [analysis, setAnalysis] = useState<ContradictionAnalysis | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   async function startDemo() {
     setLoading(true);
     const response = await fetch("/api/demo", { method: "POST" });
     setCaseData(await response.json());
     setLoading(false);
+  }
+
+  async function validateWithGemini() {
+    if (!caseData) return;
+    setAnalyzing(true); setAnalysisError(null);
+    const response = await fetch("/api/analyze", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ extractedText: caseData.redactedPayload })
+    });
+    const result = await response.json() as { analysis?: ContradictionAnalysis; error?: string };
+    if (response.ok && result.analysis) setAnalysis(result.analysis);
+    else setAnalysisError(result.error ?? "The model analysis could not be completed.");
+    setAnalyzing(false);
   }
 
   async function approve() {
@@ -41,10 +58,13 @@ export default function Home() {
         <article id="policy-record" className="rule"><p className="label">THE RULE THAT APPLIES</p><strong>{caseData.policyMonths} months</strong><p>of uninterrupted coverage</p><blockquote>{caseData.legalQuote}</blockquote><a href={caseData.sources[2].href} target="_blank">View primary source ↗</a></article>
       </div>
       <div className="verdict"><span>CONTRADICTION FOUND</span><p>The policy has been active for <b>63 months</b>. The cited ground became unavailable after month 60 unless established fraud is alleged. This letter alleges none.</p></div>
+      <div className="model-check"><div><p className="eyebrow">Independent model check</p><p>Run Gemini 2.5 Flash on the same redacted evidence. It cannot see the original document text.</p></div><button onClick={validateWithGemini} disabled={analyzing}>{analyzing ? "Checking cited evidence…" : "Validate with Gemini"}</button></div>
+      {analysis && <div className="model-result"><p className="label">MODEL RESULT · REDACTED INPUT ONLY</p><b>{analysis.conclusion}</b>{analysis.claims.map((claim, index) => <p key={`${claim.claim}-${index}`}>{claim.claim} <small>Source: {claim.source} · confidence {Math.round(claim.confidence * 100)}%</small></p>)}</div>}
+      {analysisError && <p className="model-error">Model check unavailable: {analysisError}</p>}
 
       <section className="consent">
         <div><p className="eyebrow">Consent gate</p><h2>The agent stops here.</h2><p>Review the exact draft, its sources, and its file fingerprint before you approve a one-time signing capability.</p></div>
-        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button></div>
+        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href="/api/draft" target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button></div>
       </section>
 
       <section className="ledger"><div><p className="eyebrow">Agent authority ledger</p><h2>{caseData.ledger.length} tool calls, one hard boundary.</h2><p>Only reversible document work ran automatically.</p></div><div className="ledger-columns">

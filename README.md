@@ -19,11 +19,13 @@ Open `http://localhost:3000` and choose **Run the 63-month demo**.
 
 - PII redaction happens before `prepareModelInput` returns data to the model boundary.
 - The redacted payload is intentionally inspectable in the UI.
+- The draft is an actual generated PDF. The displayed SHA-256 is calculated from the same immutable PDF bytes served by `/api/draft`.
 - The consent route mints a one-time, single-envelope capability only after explicit attestation of the displayed SHA-256 hash.
 - The agent runtime has a fixed, capability-poor environment containing only reversible document tools. It has no signing credential or signing capability.
 - The Agent Authority Ledger exposes every automatic action and the blocked signing action.
+- Gemini 2.5 Flash is wired through one server-only provider interface, with structured JSON output. The analysis function owns the redaction boundary and was verified using the seeded synthetic case.
 
-The service adapters for Nutrient DWS, SerpApi, Gemini, and Foxit eSign are intentionally not represented as successful live integrations until event credentials are supplied and their sandbox behavior is verified. The current demo is safe to run without vendor credentials and never purports to submit a real filing.
+Nutrient DWS, SerpApi, and Foxit eSign are intentionally not represented as successful live integrations until event credentials are supplied and their sandbox behavior is verified. The current demo is safe to run without those credentials and never purports to submit a real filing.
 
 ## Foxit boundary position
 
@@ -34,10 +36,10 @@ Signing should remain outside the agent's toolset. We go further: reversibility 
 ```text
  RUN  v3.0.5 /Users/ashraf/Desktop/PROJECTS/DevNetwork [API + Cloud + AI] Hackathon 2026
 
- ✓ tests/security.test.ts (2 tests) 1ms
+ ✓ tests/security.test.ts (3 tests) 1ms
 
  Test Files  1 passed (1)
-      Tests  2 passed (2)
+      Tests  3 passed (3)
 ```
 
 Run it with:
