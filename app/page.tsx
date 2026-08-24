@@ -12,7 +12,7 @@ export default function Home() {
   const [approved, setApproved] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const [signingCapability, setSigningCapability] = useState<string | null>(null);
-  const [signerEmail, setSignerEmail] = useState("");
+  const [signerEmail] = useState("demo-signer@example.com");
   const [signingState, setSigningState] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ContradictionAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -82,7 +82,7 @@ export default function Home() {
     setSigningState("Preparing the sandbox session…");
     const response = await fetch("/api/sign", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ caseId: caseData.caseId, signingCapability, recipientEmail: signerEmail, recipientName: caseData.policyholder }),
+      body: JSON.stringify({ caseId: caseData.caseId, signingCapability, recipientEmail: signerEmail, recipientName: "Demo Signer" }),
     });
     const result = await response.json() as { status?: string; error?: string; sendingSessionUrl?: string | null };
     if (!response.ok) setSigningState(result.error ?? "The signing session could not be prepared.");
@@ -129,7 +129,7 @@ export default function Home() {
 
       <section className="consent">
         <div><p className="eyebrow">Consent gate</p><h2>The agent stops here.</h2><p>Review the exact draft, its sources, and its file fingerprint before you approve a one-time signing capability.</p></div>
-        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href="/api/draft" target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button>{approved && <div className="signing-form"><p className="label">Human-controlled Foxit sandbox</p><label>Signer email<input type="email" value={signerEmail} onChange={(event) => setSignerEmail(event.target.value)} placeholder="signer@example.com" /></label><button onClick={prepareSigningSession} disabled={!signingCapability || !signerEmail}>{signingCapability ? "Prepare signing session" : "Signing capability consumed"}</button>{signingState && <p>{signingState}</p>}</div>}</div>
+        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href="/api/draft" target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button>{approved && <div className="signing-form"><p className="label">Synthetic Foxit sandbox signer</p><p>This uses <code>demo-signer@example.com</code>. It creates an unsent sandbox envelope only.</p><button onClick={prepareSigningSession} disabled={!signingCapability}>{signingCapability ? "Prepare demo signing session" : "Demo signing capability consumed"}</button>{signingState && <p>{signingState}</p>}</div>}</div>
       </section>
       {approvalError && <p className="model-error">Approval unavailable: {approvalError}</p>}
 
