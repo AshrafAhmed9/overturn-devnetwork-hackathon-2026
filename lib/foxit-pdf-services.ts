@@ -81,7 +81,8 @@ export class FoxitPdfServices {
       } },
       { name: "merge_pdfs", execute: async () => {
         await this.timed("merge_pdfs", "Foxit PDF Services combined the representation and its exhibit.", async () => {
-          mergedId = await this.submit("/documents/enhance/pdf-combine", { documents: [{ documentId: representationId }, { documentId: evidenceId }] });
+          // Foxit PDF Services names this request member documentInfos.
+          mergedId = await this.submit("/documents/enhance/pdf-combine", { documentInfos: [{ documentId: representationId }, { documentId: evidenceId }] });
         }, events);
       } },
       { name: "ocr_pdf", execute: async () => {
