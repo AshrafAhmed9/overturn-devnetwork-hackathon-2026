@@ -28,7 +28,7 @@ Required runtime values are documented in `.env.example`. The browser receives o
 - **SerpApi:** the seeded demo performs a cached live query restricted to IRDAI. It accepts a result only when it is a direct `irdai.gov.in/documents/...pdf` URL; redirect, search, and `update_language` URLs are rejected. If the search does not return that direct PDF, the UI links to the official IRDAI Health circular index rather than relabelling an untrusted result.
 - **Human gate:** approving the rendered hash atomically advances the case in Supabase. A duplicate approval returns HTTP 409 and cannot mint a second capability.
 - **Foxit PDF Services:** the seeded document is created from two text sources, merged, OCRed, text-extracted, and compressed by Foxit PDF Services. The app saves those exact resulting bytes in a protected Supabase bucket before showing their hash.
-- **Foxit eSign sandbox:** the one-time capability is hashed in the case record, consumed by a dedicated server-only signing boundary, and then opens an embedded Foxit signing session. A human completes the sandbox signature; the agent module has neither eSign credentials nor the capability.
+- **Foxit eSign sandbox:** the one-time capability is hashed in the case record, consumed by a dedicated server-only signing boundary, and then opens an embedded Foxit signing session. Only a human can complete the sandbox signature; the agent module has neither eSign credentials nor the capability.
 - **Authority Ledger:** the app shows only completed, timed Foxit calls from the current document run. It never displays invented telemetry.
 
 The independent Gemini check uses `gemini-2.5-flash` through a single `LanguageProvider` interface. It is hidden when `GEMINI_API_KEY` is not configured; the seeded contradiction and consent gate do not depend on a model response.
@@ -58,7 +58,7 @@ It executes its explicit document plan against Foxit PDF Services. There is no s
 ```text
  RUN  v3.0.5
 
- ✓ tests/security.test.ts (6 tests)
+ ✓ tests/security.test.ts (7 tests)
 
  Test Files  1 passed (1)
       Tests  6 passed (6)
@@ -75,7 +75,7 @@ The jailbreak test requests `esign_send_envelope` from the document agent. It fa
 ## Verified locally against live services
 
 - Nutrient Data Extraction returned 9 page-anchored confidence fields from the generated PDF.
-- Foxit PDF Services credentials accepted an uploaded synthetic PDF. The full live pipeline is verified by the deployed seeded route and reports timing for each completed operation.
+- The deployed seeded route completed Foxit PDF generation, merge, OCR, text extraction, compression, and protected exact-byte storage; its live ledger reports the measured operation timings.
 - SerpApi output is URL-validated before display; a direct-PDF miss falls back to the official IRDAI circular index.
 - Supabase persisted a seeded case and audit events; an attestation succeeded once and the duplicate was blocked with HTTP 409.
 - Production build and the six security tests pass.

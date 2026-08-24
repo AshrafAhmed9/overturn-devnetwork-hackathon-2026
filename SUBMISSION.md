@@ -10,9 +10,9 @@ Overturn is a document-first claim-review tool for a painful but common situatio
 
 The demo uses a synthetic Indian health-insurance case. A rejection letter alleges non-disclosure after 63 months of continuous cover and does not allege fraud. Overturn finds the current IRDAI health-insurance circular through SerpApi, places the cited ground beside the rule, and shows the contradiction: the 60-month moratorium had already elapsed.
 
-The point is not just the conclusion. Overturn makes the boundary visible. Nutrient extracts page-anchored evidence with confidence scores; uncertain fields are shown for human correction. PII is redacted before model use. The draft representation is rendered as a PDF, hashed, and shown with its sources. The agent can perform reversible document work, but signing stays outside its environment.
+The point is not just the conclusion. Overturn makes the boundary visible. Nutrient provides a separate evidence lab that extracts page-anchored evidence with confidence scores; uncertain or incomplete fields are shown for human correction. PII is redacted before model use. Foxit PDF Services creates, merges, OCRs, extracts, and compresses the seeded representation; the exact resulting bytes are hashed and shown with sources. The bounded document agent can perform reversible document work, but signing stays outside its environment.
 
-Only a human approval of the exact PDF mints a one-time signing capability. Supabase records the case and append-only audit events. The Foxit sandbox handoff consumes that capability before it prepares an unsent eSign envelope. A duplicate approval is rejected.
+Only a human approval of the exact PDF mints a one-time signing capability. Supabase records the case and append-only audit events. The Foxit sandbox handoff consumes that capability before it opens an embedded eSign session for the human signer. A duplicate approval is rejected.
 
 ## Built with
 
