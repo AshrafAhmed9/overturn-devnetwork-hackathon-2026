@@ -9,7 +9,7 @@ const ACCEPTED_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "i
 export async function POST(request: Request) {
   const form = await request.formData();
   const document = form.get("document");
-  if (!(document instanceof File)) return NextResponse.json({ error: "A PDF, JPEG, PNG, or TIFF document is required." }, { status: 400 });
+  if (!(document instanceof File)) return NextResponse.json({ error: "A PDF or image document is required." }, { status: 400 });
   if (!ACCEPTED_TYPES.has(document.type) || document.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json({ error: "Only PDF, JPEG, PNG, or TIFF documents up to 10 MB are accepted." }, { status: 400 });
   }

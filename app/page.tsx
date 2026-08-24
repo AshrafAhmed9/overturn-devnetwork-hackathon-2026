@@ -148,7 +148,7 @@ export default function Home() {
       <button onClick={startDemo} disabled={loading}>{loading ? "Reviewing case…" : "Run the 63-month demo"}</button>
       {loading && <div className="pipeline-live" aria-live="polite"><span>Foxit pipeline is running</span>{pipelineEvents.length ? pipelineEvents.map(item => <p key={item.tool}>✓ {item.tool}<small>{item.duration}</small></p>) : <p>Preparing cited evidence…</p>}</div>}
       {caseData && <a className="demo-ready" href="#case-finding">Your finding is ready below <span aria-hidden="true">↓</span></a>}
-      <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Test Nutrient extraction"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label>
+      <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Test Nutrient extraction"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label><a className="sample-link" href="/overturn-ambiguous-scan.png" download>Download low-confidence scan ↗</a>
       <p className="fine">Synthetic documents only. No information is sent to a model until personal details are removed.</p>
       {uploadState && <p className="upload-success">Nutrient returned {extractedFields?.length ?? 0} page-anchored evidence regions. {uploadState.needsReview ? uploadState.reviewReason ?? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."} This evidence-lab upload does not replace the seeded case used to generate the legal draft.</p>}
       {uploadError && <p className="model-error">Upload unavailable: {uploadError}</p>}
@@ -157,7 +157,7 @@ export default function Home() {
     {extractedFields && <section className="correction-panel" aria-live="polite">
       <p className="eyebrow">Evidence confirmation</p>
       <h2>Confirm any uncertain extraction.</h2>
-      <p>Only fields below 90% confidence need editing. Their page coordinates stay attached to the evidence.</p>
+      <p>Fields below 90% confidence, or missing required claim facts, need editing. Their page coordinates stay attached to the evidence.</p>
       <div className="correction-list">{extractedFields.map((field, index) => {
         const needsReview = field.confidence < 0.9;
         return <label key={`${field.page}-${index}`} className={needsReview ? "needs-review" : "accepted-field"}>
