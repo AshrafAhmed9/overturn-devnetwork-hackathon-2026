@@ -50,7 +50,12 @@ async function getObject(path: string) {
   const { url, headers } = configuration();
   const response = await fetch(`${url}/storage/v1/object/${path}`, { headers, signal: AbortSignal.timeout(30_000) });
   if (response.status === 404) return undefined;
-  if (!response.ok) throw new Error(`Unable to read protected draft storage (${response.status}).`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { code?: string; statusCode?: string };
+    // Supabase Storage reports a missing object as HTTP 400 plus NoSuchKey.
+    if (body.code === "NoSuchKey" || body.statusCode === "404") return undefined;
+    throw new Error(`Unable to read protected draft storage (${response.status}).`);
+  }
   return response;
 }
 
