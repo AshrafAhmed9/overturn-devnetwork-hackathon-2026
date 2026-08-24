@@ -3,17 +3,18 @@ import { performance } from "node:perf_hooks";
 import type { DemoCase } from "./domain";
 import { prepareModelInput } from "./redaction";
 import { demoLegalQuote, getDemoArtifact } from "./document-generator";
+import type { FoxitPipelineEvent } from "./foxit-pdf-services";
 import type { RegulatorySource } from "./regulatory-lookup";
 
 import { IRDAI_CIRCULAR_INDEX_URL } from "./regulatory-lookup";
 const sourceUrl = IRDAI_CIRCULAR_INDEX_URL;
 const originalExtraction = `Repudiation letter — 17/08/2026\nPolicyholder: Ananya Rao\nPolicy No: HLTH-IND-782193\nAadhaar: 0000 0000 0000\nPAN: ABCDE0000F\nDate of birth: 12/08/1987\nGround: non-disclosure / misrepresentation of a pre-existing condition. No fraud is alleged.\nContinuous coverage: 63 months.`;
 
-export async function createDemoCase(regulatorySource?: RegulatorySource): Promise<DemoCase> {
+export async function createDemoCase(regulatorySource?: RegulatorySource, onEvent?: (event: FoxitPipelineEvent) => void): Promise<DemoCase> {
   const redactionStarted = performance.now();
   const input = prepareModelInput(originalExtraction);
   const redactionElapsed = performance.now() - redactionStarted;
-  const artifact = await getDemoArtifact();
+  const artifact = await getDemoArtifact(onEvent);
   const pdfBytes = artifact.bytes;
   return {
     policyMonths: 63,

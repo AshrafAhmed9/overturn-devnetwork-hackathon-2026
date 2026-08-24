@@ -19,11 +19,12 @@ export class FoxitPdfServices {
     return { client_id: clientId, client_secret: clientSecret };
   }
 
-  private async timed(tool: string, note: string, action: () => Promise<void>, events: FoxitPipelineEvent[]) {
+  private async timed(tool: string, note: string, action: () => Promise<void>, events: FoxitPipelineEvent[], onEvent?: (event: FoxitPipelineEvent) => void) {
     const started = performance.now();
     await action();
     const elapsed = performance.now() - started;
-    events.push({ tool, duration: elapsed >= 1000 ? `${(elapsed / 1000).toFixed(1)}s` : `${Math.round(elapsed)}ms`, kind: "reversible", note });
+    const event = { tool, duration: elapsed >= 1000 ? `${(elapsed / 1000).toFixed(1)}s` : `${Math.round(elapsed)}ms`, kind: "reversible" as const, note };
+    events.push(event); onEvent?.(event);
   }
 
   private async upload(text: string, filename: string) {
@@ -65,7 +66,7 @@ export class FoxitPdfServices {
     return new Uint8Array(await response.arrayBuffer());
   }
 
-  async renderRepresentation(input: { draftText: string; evidenceText: string }) {
+  async renderRepresentation(input: { draftText: string; evidenceText: string }, onEvent?: (event: FoxitPipelineEvent) => void) {
     const events: FoxitPipelineEvent[] = [];
     let representationId = "";
     let evidenceId = "";
@@ -77,29 +78,29 @@ export class FoxitPdfServices {
         await this.timed("generate_document", "Foxit PDF Services created the representation and cited-evidence PDFs.", async () => {
           representationId = await this.submit("/documents/create/pdf-from-text", { documentId: await this.upload(input.draftText, "overturn-representation.txt") });
           evidenceId = await this.submit("/documents/create/pdf-from-text", { documentId: await this.upload(input.evidenceText, "overturn-evidence.txt") });
-        }, events);
+        }, events, onEvent);
       } },
       { name: "merge_pdfs", execute: async () => {
         await this.timed("merge_pdfs", "Foxit PDF Services combined the representation and its exhibit.", async () => {
           // Foxit PDF Services names this request member documentInfos.
           mergedId = await this.submit("/documents/enhance/pdf-combine", { documentInfos: [{ documentId: representationId }, { documentId: evidenceId }] });
-        }, events);
+        }, events, onEvent);
       } },
       { name: "ocr_pdf", execute: async () => {
         await this.timed("ocr_pdf", "Foxit PDF Services ran OCR on the assembled PDF.", async () => {
           ocrId = await this.submit("/documents/analyze/pdf-ocr", { documentId: mergedId, config: { languages: ["en-US"] } });
-        }, events);
+        }, events, onEvent);
       } },
       { name: "extract_text", execute: async () => {
         await this.timed("extract_text", "Foxit PDF Services extracted text from the OCR output.", async () => {
           const textId = await this.submit("/documents/convert/pdf-to-text", { documentId: ocrId });
           await this.download(textId);
-        }, events);
+        }, events, onEvent);
       } },
       { name: "compress_pdf", execute: async () => {
         await this.timed("compress_pdf", "Foxit PDF Services compressed the final human-review copy.", async () => {
           compressedId = await this.submit("/documents/modify/pdf-compress", { documentId: ocrId, compressionLevel: "LOW" });
-        }, events);
+        }, events, onEvent);
       } },
     ]);
     await runDocumentAgent(environment, ["generate_document", "merge_pdfs", "ocr_pdf", "extract_text", "compress_pdf"]);

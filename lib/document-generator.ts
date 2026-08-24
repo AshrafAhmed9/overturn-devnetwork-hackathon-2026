@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { DocumentGenerator } from "./providers";
 import { FoxitPdfServices, type FoxitPipelineEvent } from "./foxit-pdf-services";
+import { readSeededArtifact, saveSeededArtifact } from "./draft-store";
 
 export const demoLegalQuote = "After completion of sixty continuous months of coverage (including portability and migration) in health insurance policy, no policy and claim shall be contestable by the insurer on grounds of non-disclosure, misrepresentation, except on grounds of established fraud.";
 
@@ -40,11 +41,15 @@ function evidenceText() {
 }
 
 /** One immutable artifact per warm server instance is used for the displayed hash and draft download. */
-export function getDemoArtifact() {
+export function getDemoArtifact(onEvent?: (event: FoxitPipelineEvent) => void) {
   demoArtifactPromise ??= (async () => {
     try {
-      const artifact = await new FoxitPdfServices().renderRepresentation({ draftText: draftText(), evidenceText: evidenceText() });
-      return { ...artifact, provider: "foxit" as const };
+      const persisted = await readSeededArtifact();
+      if (persisted) return persisted;
+      const artifact = await new FoxitPdfServices().renderRepresentation({ draftText: draftText(), evidenceText: evidenceText() }, onEvent);
+      const completed = { ...artifact, provider: "foxit" as const };
+      await saveSeededArtifact(completed.bytes, { events: completed.events, provider: "foxit" });
+      return completed;
     } catch (error) {
       console.error("Foxit PDF Services unavailable; using local PDF fallback", error);
       const bytes = await new LocalPdfGenerator().render("representation", { policyholder: "Ananya Rao", policyMonths: 63, legalQuote: demoLegalQuote });

@@ -71,3 +71,23 @@ export async function prepareFoxitSandboxSigningSession(input: {
     signingSessionUrl: findString(body, /embedded.*(?:url|URL)|signing.*(?:url|URL)/),
   };
 }
+
+function eSignHeaders() {
+  const clientId = process.env.FOXIT_ESIGN_CLIENT_ID;
+  const clientSecret = process.env.FOXIT_ESIGN_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("Foxit eSign sandbox credentials are not configured.");
+  return { client_id: clientId, client_secret: clientSecret };
+}
+
+export async function getFoxitEnvelope(folderId: string) {
+  const response = await fetch(`https://na1.fusion.foxit.com/esign/api/v1/folders/myfolder?folderId=${encodeURIComponent(folderId)}`, { headers: eSignHeaders(), signal: AbortSignal.timeout(30_000) });
+  const body = await response.json().catch(() => ({})) as { folder?: { folderStatus?: string } };
+  if (!response.ok || !body.folder?.folderStatus) throw new Error(`Foxit eSign status request failed (${response.status}).`);
+  return body.folder.folderStatus;
+}
+
+export async function downloadFoxitEnvelope(folderId: string) {
+  const response = await fetch(`https://na1.fusion.foxit.com/esign/api/v1/folders/download?folderId=${encodeURIComponent(folderId)}`, { headers: eSignHeaders(), signal: AbortSignal.timeout(30_000) });
+  if (!response.ok) throw new Error(`Foxit eSign download failed (${response.status}).`);
+  return new Uint8Array(await response.arrayBuffer());
+}

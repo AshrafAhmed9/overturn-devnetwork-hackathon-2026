@@ -9,12 +9,15 @@ type ExtractedField = { text: string; confidence: number; page: string; bounds: 
 export default function Home() {
   const [caseData, setCaseData] = useState<DemoCase | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pipelineEvents, setPipelineEvents] = useState<Array<{ tool: string; duration: string }>>([]);
   const [approved, setApproved] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const [signingCapability, setSigningCapability] = useState<string | null>(null);
   const [signerEmail] = useState("demo-signer@example.com");
   const [signingState, setSigningState] = useState<string | null>(null);
   const [signingUrl, setSigningUrl] = useState<string | null>(null);
+  const [envelopeId, setEnvelopeId] = useState<string | null>(null);
+  const [executedDownloadUrl, setExecutedDownloadUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ContradictionAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -40,11 +43,24 @@ export default function Home() {
 
   async function startDemo() {
     setLoading(true);
-    setApproved(false); setApprovalError(null); setSigningCapability(null); setSigningState(null); setSigningUrl(null);
+    setPipelineEvents([]);
+    setApproved(false); setApprovalError(null); setSigningCapability(null); setSigningState(null); setSigningUrl(null); setEnvelopeId(null); setExecutedDownloadUrl(null);
+    setUploadError(null);
     const response = await fetch("/api/demo", { method: "POST" });
-    const result = await response.json() as DemoCase & { error?: string };
-    if (response.ok) setCaseData(result);
-    else setUploadError(result.error ?? "The demo could not be started.");
+    if (!response.ok || !response.body) { setUploadError("The demo could not be started."); setLoading(false); return; }
+    const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
+    while (true) {
+      const chunk = await reader.read(); if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      const frames = buffer.split("\n\n"); buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        const type = frame.match(/^event: (.+)$/m)?.[1]; const raw = frame.match(/^data: (.+)$/m)?.[1]; if (!type || !raw) continue;
+        const payload = JSON.parse(raw) as DemoCase & { tool?: string; duration?: string; error?: string };
+        if (type === "pipeline" && payload.tool && payload.duration) setPipelineEvents(events => [...events, { tool: payload.tool!, duration: payload.duration! }]);
+        if (type === "complete") setCaseData(payload);
+        if (type === "error") setUploadError(payload.error ?? "The demo could not be started.");
+      }
+    }
     setLoading(false);
   }
 
@@ -103,14 +119,25 @@ export default function Home() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ caseId: caseData.caseId, signingCapability, recipientEmail: signerEmail, recipientName: "Demo Signer" }),
     });
-    const result = await response.json() as { status?: string; error?: string; signingSessionUrl?: string | null };
+    const result = await response.json() as { status?: string; error?: string; envelopeId?: string; signingSessionUrl?: string | null };
     if (!response.ok) setSigningState(result.error ?? "The signing session could not be prepared.");
     else {
       setSigningUrl(result.signingSessionUrl ?? null);
+      setEnvelopeId(result.envelopeId ?? null);
       setSigningState(result.signingSessionUrl ? "Sandbox signing session prepared. Open it in Foxit to apply the demo signature." : "Sandbox envelope prepared. Foxit did not return an embedded signing URL.");
     }
     setSigningCapability(null);
   }
+
+  useEffect(() => {
+    if (!envelopeId || executedDownloadUrl) return;
+    const timer = window.setInterval(() => {
+      void fetch(`/api/sign?folderId=${encodeURIComponent(envelopeId)}`).then(response => response.json()).then((result: { status?: string; downloadUrl?: string | null }) => {
+        if (result.status === "EXECUTED" && result.downloadUrl) { setExecutedDownloadUrl(result.downloadUrl); setSigningState("Signature completed. The executed PDF is ready."); }
+      });
+    }, 3_000);
+    return () => window.clearInterval(timer);
+  }, [envelopeId, executedDownloadUrl]);
 
   return <main>
     <nav><span className="mark">O</span><span>overturn</span><small>Claim review, under your control</small><a className="live-demo-link" href="https://overturn-devnetwork-hackathon-2026.vercel.app" target="_blank" rel="noreferrer">Live demo ↗</a></nav>
@@ -119,6 +146,7 @@ export default function Home() {
       <h1>Catch the rule your insurer<br />shouldn’t be able to use.</h1>
       <p className="lede">Overturn reads the evidence, spots a contradiction, drafts your appeal, and stops before filing. A person signs every time.</p>
       <button onClick={startDemo} disabled={loading}>{loading ? "Reviewing case…" : "Run the 63-month demo"}</button>
+      {loading && <div className="pipeline-live" aria-live="polite"><span>Foxit pipeline is running</span>{pipelineEvents.length ? pipelineEvents.map(item => <p key={item.tool}>✓ {item.tool}<small>{item.duration}</small></p>) : <p>Preparing cited evidence…</p>}</div>}
       {caseData && <a className="demo-ready" href="#case-finding">Your finding is ready below <span aria-hidden="true">↓</span></a>}
       <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Test Nutrient extraction"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label>
       <p className="fine">Synthetic documents only. No information is sent to a model until personal details are removed.</p>
@@ -152,7 +180,7 @@ export default function Home() {
 
       <section className="consent">
         <div><p className="eyebrow">Consent gate</p><h2>The agent stops here.</h2><p>Review the exact draft, its sources, and its file fingerprint before you approve a one-time signing capability.</p></div>
-        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href={caseData.caseId ? `/api/draft?caseId=${encodeURIComponent(caseData.caseId)}` : "/api/draft"} target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button>{approved && <div className="signing-form"><p className="label">Synthetic Foxit sandbox signer</p><p>This uses <code>demo-signer@example.com</code>. A human must complete the signature inside Foxit.</p><button onClick={prepareSigningSession} disabled={!signingCapability}>{signingCapability ? "Prepare demo signing session" : "Demo signing capability consumed"}</button>{signingState && <p>{signingState}</p>}{signingUrl && <a className="pdf-link" href={signingUrl} target="_blank" rel="noreferrer">Open Foxit signing session ↗</a>}</div>}</div>
+        <div className="document"><p className="label">DRAFT REPRESENTATION · PDF READY</p><h3>Representation regarding claim repudiation</h3><p>Prepared for {caseData.policyholder}. Every factual statement is traceable below.</p><a className="pdf-link" href={caseData.caseId ? `/api/draft?caseId=${encodeURIComponent(caseData.caseId)}` : "/api/draft"} target="_blank">Open the exact rendered PDF ↗</a><code>SHA-256 {caseData.documentHash}</code><button className="secondary" onClick={approve} disabled={approved}>{approved ? "One-time approval recorded" : "I reviewed this exact draft"}</button>{approved && <div className="signing-form"><p className="label">Synthetic Foxit sandbox signer</p><p>This uses <code>demo-signer@example.com</code>. A human must complete the signature inside Foxit.</p><button onClick={prepareSigningSession} disabled={!signingCapability}>{signingCapability ? "Prepare demo signing session" : "Demo signing capability consumed"}</button>{signingState && <p>{signingState}</p>}{signingUrl && <a className="pdf-link" href={signingUrl} target="_blank" rel="noreferrer">Open Foxit signing session ↗</a>}{executedDownloadUrl && <a className="pdf-link" href={executedDownloadUrl}>Download executed PDF ↗</a>}</div>}</div>
       </section>
       {approvalError && <p className="model-error">Approval unavailable: {approvalError}</p>}
 
