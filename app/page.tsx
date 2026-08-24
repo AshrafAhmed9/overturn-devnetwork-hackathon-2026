@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DemoCase } from "@/lib/domain";
 import type { ContradictionAnalysis } from "@/lib/analysis";
 
@@ -21,11 +21,24 @@ export default function Home() {
   const [extractedFields, setExtractedFields] = useState<ExtractedField[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const findingRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!caseData) return;
+    const timer = window.setTimeout(() => {
+      findingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      findingRef.current?.focus({ preventScroll: true });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [caseData]);
 
   async function startDemo() {
     setLoading(true);
+    setApproved(false); setApprovalError(null); setSigningCapability(null); setSigningState(null);
     const response = await fetch("/api/demo", { method: "POST" });
-    setCaseData(await response.json());
+    const result = await response.json() as DemoCase & { error?: string };
+    if (response.ok) setCaseData(result);
+    else setUploadError(result.error ?? "The demo could not be started.");
     setLoading(false);
   }
 
@@ -97,6 +110,7 @@ export default function Home() {
       <h1>Catch the rule your insurer<br />shouldn’t be able to use.</h1>
       <p className="lede">Overturn reads the evidence, spots a contradiction, drafts your appeal, and stops before filing. A person signs every time.</p>
       <button onClick={startDemo} disabled={loading}>{loading ? "Reviewing case…" : "Run the 63-month demo"}</button>
+      {caseData && <a className="demo-ready" href="#case-finding">Your finding is ready below <span aria-hidden="true">↓</span></a>}
       <label className="file-picker">{uploading ? "Extracting with Nutrient…" : "Try a PDF or scan"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) void extractUpload(file); }} disabled={uploading} /></label>
       <p className="fine">Synthetic documents only. No information is sent to a model until personal details are removed.</p>
       {uploadState && <p className="upload-success">Nutrient returned {extractedFields?.length ?? 0} page-anchored evidence regions. {uploadState.needsReview ? "A low-confidence field needs review." : "All returned fields cleared the confidence threshold."}</p>}
@@ -116,7 +130,7 @@ export default function Home() {
       })}</div>
     </section>}
 
-    {caseData && <section className="workspace">
+    {caseData && <section className="workspace" id="case-finding" ref={findingRef} tabIndex={-1}>
       <div className="section-title"><p className="eyebrow">Case finding</p><h2>The insurer’s reason is three months late.</h2></div>
       <div className="finding">
         <article id="rejection-letter"><p className="label">THE REJECTION LETTER</p><h3>“Pre-existing condition was not disclosed.”</h3><p>Reason given: {caseData.rejectionGround}.</p><p className="danger">No fraud allegation appears in the letter.</p><a href="#source-list">View source · Page 1</a></article>
