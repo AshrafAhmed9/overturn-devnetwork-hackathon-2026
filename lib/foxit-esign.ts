@@ -12,6 +12,16 @@ function findString(record: unknown, keyPattern: RegExp): string | undefined {
   return undefined;
 }
 
+function findIdentifier(record: unknown, keyPattern: RegExp): string | undefined {
+  if (!record || typeof record !== "object") return undefined;
+  for (const [key, value] of Object.entries(record)) {
+    if (keyPattern.test(key) && (typeof value === "string" || typeof value === "number")) return String(value);
+    const nested = findIdentifier(value, keyPattern);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 /** Dedicated server-only eSign adapter. It is deliberately outside agent.ts. */
 export async function prepareFoxitSandboxSigningSession(input: {
   documentUrl: string;
@@ -57,7 +67,7 @@ export async function prepareFoxitSandboxSigningSession(input: {
   const body = await response.json().catch(() => ({})) as FoxitEnvelopeResponse;
   if (!response.ok) throw new Error(`Foxit eSign sandbox request failed (${response.status}).`);
   return {
-    reference: findString(body, /folder(?:id|Id)|envelope(?:id|Id)|id$/) ?? "sandbox-envelope",
+    reference: findIdentifier(body, /^(?:folder|envelope)(?:id|Id)$/) ?? "sandbox-envelope",
     signingSessionUrl: findString(body, /embedded.*(?:url|URL)|signing.*(?:url|URL)/),
   };
 }
