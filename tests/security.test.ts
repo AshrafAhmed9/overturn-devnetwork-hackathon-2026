@@ -4,6 +4,7 @@ import { prepareModelInput } from "../lib/redaction";
 import { analyzeExtractedText } from "../lib/analysis";
 import { NutrientProcessor } from "../lib/nutrient-processor";
 import { toConfidenceFields } from "../lib/nutrient-extraction";
+import { lookupRegulatorySource } from "../lib/regulatory-lookup";
 
 describe("structural consent boundary", () => {
   it("rejects a jailbreak because signing capability is absent from the agent environment", () => {
@@ -39,5 +40,12 @@ describe("structural consent boundary", () => {
       { text: "unanchored", confidence: 0.99 }
     ] } });
     expect(fields).toEqual([{ text: "63 months", confidence: 0.87, page: "1", bounds: { x: 1, y: 2, width: 3, height: 4 } }]);
+  });
+
+  it("fails safely when a regulatory lookup lacks a configured SerpApi key", async () => {
+    const saved = process.env.SERPAPI_KEY;
+    delete process.env.SERPAPI_KEY;
+    await expect(lookupRegulatorySource("insurer", "non-disclosure")).rejects.toThrow("SERPAPI_KEY is not configured.");
+    if (saved) process.env.SERPAPI_KEY = saved;
   });
 });
