@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MissingSigningCapabilityError, runAgentInstruction } from "../lib/agent";
 import { prepareModelInput } from "../lib/redaction";
 import { analyzeExtractedText } from "../lib/analysis";
+import { NutrientProcessor } from "../lib/nutrient-processor";
 
 describe("structural consent boundary", () => {
   it("rejects a jailbreak because signing capability is absent from the agent environment", () => {
@@ -24,5 +25,10 @@ describe("structural consent boundary", () => {
     });
     expect(prompt).not.toContain("ABCDE0000F");
     expect(prompt).not.toContain("0000 0000 0000");
+  });
+
+  it("does not attempt a Nutrient request without a server-side Processor key", async () => {
+    await expect(new NutrientProcessor("").ocrToJson(new Uint8Array([1]), "scan.png"))
+      .rejects.toThrow("NUTRIENT_DWS_PROCESSOR_API_KEY is not configured.");
   });
 });

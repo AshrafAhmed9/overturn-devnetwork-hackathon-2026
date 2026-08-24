@@ -27,6 +27,8 @@ Open `http://localhost:3000` and choose **Run the 63-month demo**.
 
 Nutrient DWS, SerpApi, and Foxit eSign are intentionally not represented as successful live integrations until event credentials are supplied and their sandbox behavior is verified. The current demo is safe to run without those credentials and never purports to submit a real filing.
 
+Nutrient requires two credentials for the planned workflow: the DWS Processor API key for OCR/redaction workflows and a separate Data Extraction API key for typed fields and confidence scores. The keys are not interchangeable.
+
 ## Foxit boundary position
 
 Signing should remain outside the agent's toolset. We go further: reversibility alone is not enough. A merge is reversible in theory, but after a human has attested to a signed file, changing that file misrepresents what they approved. Overturn therefore permits document assembly before attestation and gates any operation that changes what a person has already vouched for.
