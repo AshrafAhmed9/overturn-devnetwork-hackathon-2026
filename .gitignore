@@ -4,3 +4,12 @@ node_modules
 .env.local
 coverage
 .vercel
+
+# Internal planning / tooling — never part of the public submission
+PLAN.md
+AGENTS.md
+VIDEO_SCRIPT.md
+.claude/
+.codex/
+graphify-out/
+CLAUDE.md
